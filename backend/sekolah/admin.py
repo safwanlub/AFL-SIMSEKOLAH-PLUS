@@ -6,7 +6,8 @@ from .models import (
     User, Yayasan, Sekolah, Unit, TahunAjaran, Guru, Pegawai, Kelas, Siswa, Ortu, Alumni,
     Penerbit, Mapel, Buku, Hobi, CitaCita, GuruMapel, SiswaOrtu, SiswaHobi, SiswaCitaCita, KomponenNilai, Nilai, NilaiDetail, Absensi, PerizinanSiswa,
     JamPelajaran, OrganisasiKelas, PiketKelas, KeuanganKelas, ProgramKelas, LogKelas, JadwalPelajaran,
-    UnitAnggota, UnitKegiatan, UnitLog, EkstrakurikulerNilai, Raport
+    UnitAnggota, UnitKegiatan, UnitLog, EkstrakurikulerNilai, Raport, JenisPembayaran, Tagihan, PembayaranLog, PengeluaranLog,
+    PenerimaanInsidentilLog
 )
 
 # -----------------------------------------------------
@@ -272,3 +273,41 @@ class RaportAdmin(admin.ModelAdmin):
     search_fields = ('siswa__nama',)
     # Kita akan buat field ini read-only di form agar tidak diubah manual
     readonly_fields = ('rata_nilai_pengetahuan', 'rata_nilai_keterampilan', 'ranking_kelas', 'total_hadir', 'total_sakit', 'total_izin', 'total_alpha')
+
+    # -----------------------------------------------------
+# 11. TAMPILKAN MODEL TRANSAKSI KEUANGAN
+# -----------------------------------------------------
+
+@admin.register(JenisPembayaran)
+class JenisPembayaranAdmin(admin.ModelAdmin):
+    list_display = ('nama_jenis', 'sekolah', 'nominal_default', 'is_recurring')
+    list_filter = ('sekolah', 'is_recurring')
+    search_fields = ('nama_jenis',)
+
+@admin.register(Tagihan)
+class TagihanAdmin(admin.ModelAdmin):
+    list_display = ('siswa', 'jenis_pembayaran', 'periode', 'nominal_tagihan', 'status_tagihan')
+    list_filter = ('status_tagihan', 'jenis_pembayaran', 'periode')
+    search_fields = ('siswa__nama',)
+
+@admin.register(PembayaranLog)
+class PembayaranLogAdmin(admin.ModelAdmin):
+    list_display = ('tagihan', 'nominal_dibayar', 'tanggal_bayar', 'metode_pembayaran')
+    list_filter = ('metode_pembayaran', 'tanggal_bayar')
+    search_fields = ('tagihan__siswa__nama',)
+
+@admin.register(PengeluaranLog)
+class PengeluaranLogAdmin(admin.ModelAdmin):
+    list_display = ('tanggal_pengeluaran', 'kategori', 'nominal', 'sekolah')
+    list_filter = ('kategori', 'sekolah', 'tanggal_pengeluaran')
+    search_fields = ('keterangan',)
+
+    # -----------------------------------------------------
+# 12. TAMPILKAN MODEL PENERIMAAN INSIDENTIL
+# -----------------------------------------------------
+
+@admin.register(PenerimaanInsidentilLog)
+class PenerimaanInsidentilLogAdmin(admin.ModelAdmin):
+    list_display = ('tanggal_penerimaan', 'kategori', 'nominal', 'sekolah')
+    list_filter = ('kategori', 'sekolah', 'tanggal_penerimaan')
+    search_fields = ('keterangan',)

@@ -9,7 +9,7 @@ from django.contrib.auth.models import AbstractUser
 class User(AbstractUser):
     nama = models.CharField(max_length=100)
     # Tambahkan field yang ada di tabel users kita
-    sekolah = models.ForeignKey('Sekolah', on_delete=models.CASCADE, related_name='users')
+    sekolah = models.ForeignKey('Sekolah', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     role = models.CharField(
         max_length=20,
         choices=[
@@ -332,6 +332,13 @@ class Nilai(models.Model):
 
     def __str__(self):
         return f"Nilai {self.siswa.nama} - {self.mapel.nama_mapel} ({self.tahun_ajaran.nama})"
+    
+    def get_detail_dict(self):
+        return {
+            detail.komponen_nilai.nama_komponen: detail.skor
+            for detail in self.details.all()
+        }
+
 
 class NilaiDetail(models.Model):
     nilai = models.ForeignKey(Nilai, on_delete=models.CASCADE, related_name='details')
@@ -553,3 +560,71 @@ class Raport(models.Model):
 
     def __str__(self):
         return f"Raport {self.jenis_raport} - {self.siswa.nama} ({self.tahun_ajaran.nama})"
+    
+    # --- Transaksi Keuangan ---
+
+class JenisPembayaran(models.Model):
+    sekolah = models.ForeignKey(Sekolah, on_delete=models.CASCADE)
+    nama_jenis = models.CharField(max_length=100) # 'SPP Bulanan', 'DSP', 'Donasi'
+    nominal_default = models.IntegerField()
+    is_recurring = models.BooleanField(default=False) # TRUE untuk SPP
+
+    class Meta:
+        unique_together = ('sekolah', 'nama_jenis')
+
+    def __str__(self):
+        return f"{self.nama_jenis} ({self.sekolah.nama_sekolah})"
+
+class Tagihan(models.Model):
+    siswa = models.ForeignKey(Siswa, on_delete=models.CASCADE)
+    jenis_pembayaran = models.ForeignKey(JenisPembayaran, on_delete=models.CASCADE)
+    tahun_ajaran = models.ForeignKey(TahunAjaran, on_delete=models.CASCADE)
+    periode = models.CharField(max_length=20) # '2025-01', '2025-02', 'Pendaftaran'
+    nominal_tagihan = models.IntegerField()
+    tanggal_jatuh_tempo = models.DateField(blank=True, null=True)
+    status_tagihan = models.CharField(
+        max_length=15,
+        choices=[('Belum Lunas', 'Belum Lunas'), ('Lunas', 'Lunas'), ('Dibatalkan', 'Dibatalkan')],
+        default='Belum Lunas'
+    )
+
+    class Meta:
+        unique_together = ('siswa', 'jenis_pembayaran', 'periode')
+
+    def __str__(self):
+        return f"Tagihan {self.jenis_pembayaran.nama_jenis} - {self.siswa.nama}"
+
+class PembayaranLog(models.Model):
+    tagihan = models.ForeignKey(Tagihan, on_delete=models.CASCADE)
+    nominal_dibayar = models.IntegerField()
+    tanggal_bayar = models.DateTimeField(auto_now_add=True)
+    metode_pembayaran = models.CharField(max_length=20) # 'Tunai', 'Transfer', 'GoPay'
+    bukti_pembayaran = models.CharField(max_length=255, blank=True, null=True) # Link ke file
+    user = models.ForeignKey(User, on_delete=models.CASCADE) # Bendahara yang mencatat
+
+    def __str__(self):
+        return f"Pembayaran {self.tagihan} - {self.nominal_dibayar}"
+
+class PengeluaranLog(models.Model):
+    sekolah = models.ForeignKey(Sekolah, on_delete=models.CASCADE)
+    tanggal_pengeluaran = models.DateField()
+    kategori = models.CharField(max_length=50) # 'Operasional', 'Gaji', 'ATK'
+    keterangan = models.TextField()
+    nominal = models.IntegerField()
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"Pengeluaran {self.kategori} - {self.nominal}"
+    
+    # --- Penerimaan Insidentil (Non-Tagihan) ---
+
+class PenerimaanInsidentilLog(models.Model):
+    sekolah = models.ForeignKey(Sekolah, on_delete=models.CASCADE)
+    tanggal_penerimaan = models.DateField()
+    kategori = models.CharField(max_length=50) # 'Donasi', 'Penjualan Seragam', 'Lainnya'
+    keterangan = models.TextField() # 'Donasi dari Bapak Ahmad untuk rehab perpustakaan'
+    nominal = models.IntegerField()
+    user = models.ForeignKey(User, on_delete=models.CASCADE) # Yang mencatat (bendahara/kepsek)
+
+    def __str__(self):
+        return f"Penerimaan {self.kategori} - {self.nominal}"
