@@ -1,29 +1,17 @@
-// src/components/LoginForm.jsx
-
 import { useState } from "react";
 import axios from "axios";
-import { getAuthToken } from "../utils";
+import api from "../utils/axios";
 import "./LoginForm.css";
 
-// <--- PERHATIKAN BAGIAN INI! NAMA PROP-NYA HARUS 'onLogin' --->
 const LoginForm = ({ onLogin }) => {
+  // State untuk form data
   const [formData, setFormData] = useState({
     username: "",
     password: "",
     role: "siswa",
   });
-  const apiClient = axios.create();
 
-  const token = getAuthToken();
-  const config = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "X-CSRFToken": getCookie("csrftoken"),
-      "Content-Type": "application/json",
-    },
-    withCredentials: true,
-  };
-
+  // Fungsi untuk menangani perubahan input
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
@@ -32,9 +20,9 @@ const LoginForm = ({ onLogin }) => {
     }));
   };
 
+  // Fungsi untuk menangani submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     console.log("📤 LoginForm: Akan mengirim data ini ke server:", formData);
 
     try {
@@ -45,7 +33,10 @@ const LoginForm = ({ onLogin }) => {
 
       console.log("✅ LoginForm: Server merespon sukses!", response.data);
 
-      // <--- DAN PERHATIKAN BAGIAN INI! YANG DIPANGGIL HARUS 'onLogin' --->
+      // Simpan token ke localStorage
+      localStorage.setItem("token", response.data.token);
+
+      // Panggil fungsi onLogin dengan data user
       onLogin(response.data.user);
     } catch (error) {
       console.error(
@@ -101,7 +92,7 @@ const LoginForm = ({ onLogin }) => {
               <option value="admin_kepala">Admin / Kepala Sekolah</option>
               <option value="guru">Guru / Wali Kelas</option>
               <option value="siswa">Siswa</option>
-              <option value="ortu">Orang Tua / Wali Murid</option>
+              <option value="tu">Tata Usaha</option>
             </select>
           </div>
 
@@ -111,10 +102,7 @@ const LoginForm = ({ onLogin }) => {
         </form>
 
         <div className="login-footer">
-          <p>
-            &copy; 2025 AFL-SIMSEKOLAH-PLUS — Melayani Digitalisasi Sekolah
-            Indonesia
-          </p>
+          <p>© 2023 AFL-SIMSEKOLAH-PLUS. All rights reserved.</p>
         </div>
       </div>
     </div>

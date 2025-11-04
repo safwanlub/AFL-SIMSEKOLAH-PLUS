@@ -1,15 +1,18 @@
 // src/components/dashboard/GuruDashboard.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
-import NilaiSelector from "../NilaiSelector"; // Asumsi ini lokasi file NilaiSelector
+import NilaiSelector from "../NilaiSelector";
 
-// <--- PERUBAHAN 1: Terima 'user' dari props di sini --->
+// PERBAIKAN 1: Hanya ada SATU deklarasi fungsi GuruDashboard yang menerima props {user}
 function GuruDashboard({ user }) {
   const [selectedData, setSelectedData] = useState(null);
   const [students, setStudents] = useState([]);
-  const [nilaiData, setNilaiData] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // PERBAIKAN 2: Hanya gunakan state 'nilaiData'. Hapus state 'dataNilai' yang tidak terpakai.
+  // State ini akan menampung semua nilai per siswa.
+  const [nilaiData, setNilaiData] = useState({});
 
   // Fungsi untuk dipanggil oleh NilaiSelector saat selesai memilih
   const handleSelectionComplete = async (data) => {
@@ -54,52 +57,34 @@ function GuruDashboard({ user }) {
   };
 
   // Handler untuk menyimpan nilai
-  const handleSaveNilai = async () => {
-    if (!selectedData || Object.keys(nilaiData).length === 0) {
-      alert("Tidak ada data untuk disimpan.");
-      return;
-    }
-
-    const dataArray = Object.keys(nilaiData).map((siswaId) => ({
-      siswa_id: siswaId,
-      ...nilaiData[siswaId],
-    }));
-
-    console.log("📤 Nilai yang akan disimpan:", nilaiData);
-
-    // <--- PERUBAHAN PENTING DI SINI --->
-    const payload = {
-      gurumapel_id: selectedData.gurumapel_id, // Kirim gurumapel_id
-      tahun_ajaran_id: selectedData.tahun_ajaran_id,
-      data: dataArray,
-    };
-
-    console.log("📦 Payload dikirim ke backend:", payload);
-
+  const handleSaveNilai = async (payload) => {
     try {
-      // Hanya satu blok try...catch yang dibutuhkan
+      console.log("📦 Payload dikirim ke backend:", payload);
+
+      const token = localStorage.getItem("token");
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
       const response = await axios.post(
         "http://127.0.0.1:8000/api/save-nilai/",
         payload,
-        {
-          headers: { "Content-Type": "application/json" },
-        }
+        config
       );
-      console.log("✅ Berhasil menyimpan nilai:", response.data);
+
+      console.log("✅ Nilai berhasil disimpan:", response.data);
       alert("Nilai berhasil disimpan!");
     } catch (error) {
       console.error("❌ Error simpan nilai:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        "Terjadi kesalahan saat menyimpan nilai.";
-      alert(errorMessage);
+      alert("Gagal menyimpan nilai. Periksa console untuk detail.");
     }
   };
 
   return (
     <div className="p-4 bg-white rounded-lg shadow">
       <h2 className="text-xl font-bold mb-4">Dashboard Guru</h2>
-      //{" "}
       <NilaiSelector
         user={user}
         onSelectionComplete={handleSelectionComplete}
@@ -158,8 +143,17 @@ function GuruDashboard({ user }) {
               </tbody>
             </table>
           </div>
+
+          {/* PERBAIKAN 3: Siapkan payload yang lengkap dan benar saat tombol diklik */}
           <button
-            onClick={handleSaveNilai}
+            onClick={() => {
+              // Backend butuh konteks (mapel & tahun ajaran) + detail nilainya
+              const payload = {
+                ...selectedData, // Berisi id_mapel, tahun_ajaran, dll.
+                nilai: nilaiData, // Berisi objek nilai per siswa_id
+              };
+              handleSaveNilai(payload);
+            }}
             className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
           >
             Simpan Nilai

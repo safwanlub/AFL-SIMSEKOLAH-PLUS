@@ -2,6 +2,7 @@
 
 import React from "react";
 import GuruDashboard from "./dashboard/GuruDashboard"; // <--- SUDAH DIPERBAIKI
+import axios from "axios";
 
 function Dashboard({ user, onLogout }) {
   const renderDashboardContent = () => {

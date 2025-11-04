@@ -19,5 +19,5 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('sekolah.urls')), # <-- TAMBAHKAN INI
+    path('api/', include('sekolah.urls')),  # Pastikan ini ada
 ]

@@ -1,9 +1,10 @@
 // src/App.jsx
 
-import React, { useState } from "react";
-import axios from "axios"; // Ini masih diperlukan untuk useEffect nanti
+import React, { useState, useEffect } from "react";
 import LoginForm from "./components/LoginForm";
 import Dashboard from "./components/Dashboard";
+import axios from "axios";
+import api from "./utils/axios";
 import "./App.css";
 
 function App() {

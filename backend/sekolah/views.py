@@ -1,16 +1,20 @@
 # C:\AFL-SSPLUS\backend\sekolah\views.py
-from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from django.contrib.auth import authenticate, login
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from django.contrib.auth import update_last_login
-from django.http import JsonResponse
+from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+
 from .models import (
     Siswa,
     Guru,
@@ -27,46 +31,50 @@ import json
 # =====================================================
 # 🔐 LOGIN API
 # =====================================================
+User = get_user_model()
 
-# backend/sekolah/views.py
-
-@@api_view(['POST'])
-@permission_classes([AllowAny])
-def login_api(request):
-    try:
-        data = json.loads(request.body)
-        username = login(request.POST.get('username')
-        password = request.POST.get('token') # <--- GANTI DARI FORM LOGIN
-        # --- TAMBAHKAN INI ---
-        user = authenticate(username=username, password=password)
-
-        if user is not None:
-            return Response({'status': 'error', 'Username atau password salah.'}, status=401)
-
-        # <--- PERUBAHAN BAGIAN INI ---
-        login(request, user)
+@csrf_exempt
+@api_view(['POST'])
+@require_http_methods(["POST"])
+@permission_classes([AllowAny])  # Login tidak memerlukan autentikasi
+def login(request):
+    with transaction.atomic():
+        username = request.data.get('username')
+        password = request.data.get('password')
         
-        # <--- GENERATE TOKEN --->
-        refresh = RefreshToken.for_user(user)
-        access = refresh.access_token
-        # --- SELESAI PERUBAHAN BAGIAN INI ---
-        
-        return Response({
-            'status': 'success',
-            'message': 'Login berhasil!',
-            'user': {
-                'id': user.id,
-                'user': {
-                    'id': user.id,
-                    'username': 'rahasia', # <--- GANTI DARI INI
-                    'nama': user.nama,
-                    'token': access, # <--- KIRIMKAN TOKEN
-                }
-            }
-        })
-
-    except Exception as e:
-        return JsonResponse({'status': 'peranah kesalahan', 'token': str(e)}, status=500)
+        try:
+            user = User.objects.get(username=username)
+            if user.check_password(password):
+                # Update last login dalam transaction
+                user.last_login = timezone.now()
+                user.save(update_fields=['last_login'])
+                
+                # Generate token
+                refresh = RefreshToken.for_user(user)
+                
+                return Response({
+                    'status': 'success',
+                    'message': 'Login berhasil!',
+                    'token': str(refresh.access_token),
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'nama': getattr(user, 'nama', user.username),
+                        'role': getattr(user, 'role', 'user'),
+                        'sekolah_id': getattr(user, 'sekolah_id', None),
+                    }
+                })
+            else:
+                return Response({
+                    'status': 'error',
+                    'message': 'Password salah'
+                }, status=401)
+                
+        except User.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Username tidak ditemukan'
+            }, status=401)
 
 
 # =====================================================
@@ -126,10 +134,12 @@ def get_mapel_list_api(request):
 # =====================================================
 # 🗓️ GET TAHUN AJARAN LIST
 # =====================================================
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 @csrf_exempt
-def get_tahun_ajaran_list_api(request):
+@api_view(['GET'])
+@require_http_methods(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_tahun_ajaran_list(request):
     try:
         tahun_ajaran = TahunAjaran.objects.filter(status='Aktif').values('id', 'nama')
         return JsonResponse({'status': 'success', 'data': list(tahun_ajaran)})
@@ -316,45 +326,60 @@ def get_predikat(nilai):
         return "D"
 
 # apps/sekolah/views.py
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated]) 
 @csrf_exempt
 def save_nilai(request):
+    print("="*50)
+    print("BACKEND MENERIMA REQUEST UNTUK SIMPAN NILAI")
+    print("DATA YANG DITERIMA:", request.data)
     print("===== 🚀 REFACTORED save_nilai (GURUMAPEL_ID) =====")
     try:
-        data = json.loads(request.body)
+        # --- PERUBAHAN 1: Ambil data dari request.data langsung ---
+        # Tidak perlu json.loads lagi karena DRF sudah otomatis melakukannya
+        data = request.data
         gurumapel_id = data.get("gurumapel_id")
         tahun_ajaran_id = data.get("tahun_ajaran_id")
-        nilai_data = data.get("data", [])
+        
+        # --- PERUBAHAN 2: Ambil key "nilai" dan anggap sebagai dictionary ---
+        nilai_data_dict = data.get("nilai", {})
 
         print(f"📥 DATA MASUK: gurumapel_id={gurumapel_id}, tahun_ajaran={tahun_ajaran_id}")
 
         if not all([gurumapel_id, tahun_ajaran_id]):
-            return JsonResponse({"status": "error", "message": "Data tidak lengkap."}, status=400)
+            return JsonResponse({"status": "error", "message": "Data tidak lengkap (gurumapel_id/tahun_ajaran_id)."}, status=400)
 
-        # Langsung ambil GuruMapel, jauh lebih sederhana!
         try:
             guru_mapel = GuruMapel.objects.get(id=gurumapel_id)
             print(f"✅ GuruMapel ditemukan: {guru_mapel}")
         except GuruMapel.DoesNotExist:
             return JsonResponse({"status": "error", "message": f"GuruMapel dengan ID {gurumapel_id} tidak ditemukan."}, status=400)
 
-        # Ambil data yang dibutuhkan dari objek guru_mapel
         mapel_id = guru_mapel.mapel.id
         kelas_id = guru_mapel.kelas.id
 
         with transaction.atomic():
-            for item in nilai_data:
-                siswa_id = item.get("siswa_id")
-                nilai_pengetahuan = item.get("nilai_pengetahuan")
-                nilai_keterampilan = item.get("nilai_keterampilan")
+            # --- PERUBAHAN 3: Loop menggunakan .items() untuk object ---
+            for siswa_id, detail_nilai in nilai_data_dict.items():
+                print(f"--- Memproses siswa ID: {siswa_id} ---")
+                
+                # Ambil nilai dari object detail_nilai
+                nilai_pengetahuan = detail_nilai.get("nilai_pengetahuan")
+                nilai_keterampilan = detail_nilai.get("nilai_keterampilan")
 
                 if not siswa_id:
+                    print(f"⚠️ Lewati siswa dengan ID kosong.")
+                    continue
+
+                # Konversi siswa_id ke integer jika perlu
+                try:
+                    siswa_id_int = int(siswa_id)
+                except ValueError:
+                    print(f"⚠️ Lewati siswa_id '{siswa_id}' karena bukan angka.")
                     continue
 
                 nilai_obj, created = Nilai.objects.get_or_create(
-                    siswa_id=siswa_id,
+                    siswa_id=siswa_id_int,
                     mapel_id=mapel_id,
                     tahun_ajaran_id=tahun_ajaran_id,
                     defaults={
@@ -380,13 +405,15 @@ def save_nilai(request):
         print("🔥 ERROR DI save_nilai:", str(e))
         import traceback
         traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500) # Status 500 lebih tepat untuk error server
 
 # backend/sekolah/views.py
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 @csrf_exempt
-def get_guru_mapel_list_api(request):
+@api_view(['POST'])
+@require_http_methods(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_guru_mapel_list(request):
     try:
         # Kita tidak perlu lagi menerima guru_id dari frontend
         # Kita langsung ambil dari user yang sudah login!

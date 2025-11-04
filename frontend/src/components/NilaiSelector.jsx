@@ -1,11 +1,6 @@
-// src/components/dashboard/NilaiSelector.jsx
-
-import axios from "axios";
-import { getCookie, getAuthToken, getStoredUser } from "../utils";
 import React, { useState, useEffect } from "react";
-
-// Buat instance baru yang bersih
-const apiClient = axios.create();
+import axios from "axios";
+import api from "../utils/axios"; // Ganti dengan instance axios yang sudah dikonfigurasi
 
 function NilaiSelector({ user, onSelectionComplete }) {
   const [tahunAjaranList, setTahunAjaranList] = useState([]);
@@ -16,56 +11,39 @@ function NilaiSelector({ user, onSelectionComplete }) {
 
   // Ambil data Tahun Ajaran saat komponen dimuat
   useEffect(() => {
-    const apiClient = axios.create();
-    const token = getStoredUser(); // <--- AMBIL TOKEN DARI LOCALSTORAGE
-    const config = {
-      headers: {
-        Authorization: `Bearer ${token}`, // <--- KIRIMKAN TOKEN
-        "X-CSRFToken": getCookie("csrftoken"),
-        "Content-Type": "application/json",
-      },
-      withCredentials: true,
+    const fetchTahunAjaran = async () => {
+      try {
+        const response = await api.get("/get-tahun-ajaran-list/");
+        console.log("✅ Tahun Ajaran data:", response.data);
+        setTahunAjaranList(response.data.data || []);
+      } catch (error) {
+        console.error("❌ Gagal ambil tahun ajaran:", error);
+      }
     };
 
-    apiClient
-      .post(
-        "http:// // <--- HANY URL YANG BERUBAH disini"`api/get-tahun-ajaran-list/`,
-        {},
-        config
-      )
-      .then((res) => setTahunAjaranList(res.data.data))
-      .catch((err) => console.error("Gagal ambil tahun ajaran:", err));
+    fetchTahunAjaran();
   }, []);
 
   // Ambil data GuruMapel saat komponen dimuat
   useEffect(() => {
-    if (user?.id) {
+    const fetchGuruMapel = async () => {
+      if (!user?.id) return;
+
       setLoading(true);
+      try {
+        const response = await api.post("/get-guru-mapel-list/", {
+          guru_id: user.id,
+        });
+        console.log("✅ GuruMapel data:", response.data);
+        setGuruMapelList(response.data.data || []);
+      } catch (error) {
+        console.error("❌ Gagal ambil guru mapel:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      const token = getAuthToken(); // <--- AMBIL TOKEN
-      const config = {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "X-CSRFToken": getCookie("csrftoken"),
-          "Content-Type": "apiClient.post(http://...)",
-        },
-        withCredentials: true,
-      };
-
-      apiClient
-        .post("http://127.0.0.1:8000/api/get-guru-mapel-list/", {})
-        .then((res) => {
-          console.log(
-            "✅ NilaiSelector: API sukses, data yang diterima:",
-            res.data.data
-          );
-          setGuruMapelList(res.data.data);
-        })
-        .catch((err) => {
-          console.error("❌ NilaiSelector: API gagal:", err);
-        })
-        .finally(() => setLoading(false));
-    }
+    fetchGuruMapel();
   }, [user]);
 
   const handleSubmit = (e) => {
