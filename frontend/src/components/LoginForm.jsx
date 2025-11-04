@@ -1,9 +1,12 @@
+// src/components/LoginForm.jsx (VERSI YANG SUDAH DIPERBAIKI)
+
 import { useState } from "react";
 import axios from "axios";
-import api from "../utils/axios";
+import toast from "react-hot-toast"; // <<<< IMPOR TOAST
 import "./LoginForm.css";
 
-const LoginForm = ({ onLogin }) => {
+// --- PERBAIKAN 1: Ganti nama prop jadi 'onLoginSuccess' ---
+const LoginForm = ({ onLoginSuccess }) => {
   // State untuk form data
   const [formData, setFormData] = useState({
     username: "",
@@ -36,16 +39,20 @@ const LoginForm = ({ onLogin }) => {
       // Simpan token ke localStorage
       localStorage.setItem("token", response.data.token);
 
-      // Panggil fungsi onLogin dengan data user
-      onLogin(response.data.user);
+      // --- PERBAIKAN 2: Ambil data user dari response dan panggil fungsinya ---
+      const { user } = response.data; // Ambil data user dari response
+      onLoginSuccess(user); // Panggil fungsi yang benar dengan data user
     } catch (error) {
       console.error(
         "❌ LoginForm: Terjadi error saat login:",
         error.response?.data || error.message
       );
-      alert("Login gagal! Periksa username dan password Anda.");
+      // --- PERBAIKAN 3: Ganti alert jadi toast ---
+      toast.error("Login gagal! Periksa username dan password Anda.");
     }
-  };
+  }; // <<<< TUTUP FUNGSI handleSubmit DENGAN BENAR
+
+  // --- PERBAIKAN 4: HAPUS FUNGSI YANG SALAH LETAKNYA ---
 
   return (
     <div className="login-container">

@@ -12,7 +12,7 @@ function Dashboard({ user, onLogout }) {
 
     switch (user.role) {
       case "guru":
-        return <GuruDashboard user={user} />; // <--- SUDAH DIAKTIFKAN
+        return <GuruDashboard user={user} onLogout={onLogout} />; // <--- SUDAH DIAKTIFKAN
       case "admin_kepala":
         return <div>Dashboard Admin Kepala Sekolah (Coming Soon)</div>;
       case "tu":
